@@ -69,28 +69,25 @@ impl fmt::Display for Map {
 }
 
 fn is_visible(x: usize, y: usize, px: usize, py: usize, map: &Map) -> bool {
-    if map.at(x, y).obstructing() {
-        return true;
-    }
     if x < px && y < py {
         // Top-left corner
         let xdiff = px - x;
         let ydiff = py - y;
         if ydiff > xdiff {
-            let yinc = 1;
-            let xinc = xdiff as f64 / (ydiff - 1) as f64;
+            let yinc: f64 = -1.0;
+            let xinc = -(xdiff as f64 / (ydiff - 1) as f64);
 
-            let mut xcur = x as f64;
-            let mut ycur = y;
+            let mut xcur = px as f64;
+            let mut ycur = py as f64;
 
             loop {
-                let tile = map.at(xcur.round() as usize, ycur);
+                let tile = map.at(xcur.round() as usize, ycur.round() as usize);
                 if tile.obstructing() {
                     return false;
                 }
                 xcur = xcur + xinc;
                 ycur = ycur + yinc;
-                if ycur == py {
+                if ycur as usize == y {
                     break;
                 }
             }
@@ -131,6 +128,8 @@ fn main() {
     let py = 15;
 
     let mut map = Map::new(30, 20);
+
+    // Square in top left corner
     map.set_at(3 + 4, 3, Tile::Wall);
     map.set_at(4 + 4, 3, Tile::Wall);
     map.set_at(5 + 4, 3, Tile::Wall);
