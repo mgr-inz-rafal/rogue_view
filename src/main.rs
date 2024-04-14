@@ -1,5 +1,5 @@
 use core::fmt;
-use std::io;
+use std::{cmp::Ordering, io};
 
 use crossterm::{
     execute,
@@ -69,34 +69,45 @@ impl fmt::Display for Map {
 }
 
 fn is_visible(x: usize, y: usize, px: usize, py: usize, map: &Map) -> bool {
-    if x < px && y < py {
+    let (xinc, yinc) = if x < px && y < py {
         // Top-left corner
         let xdiff = px - x;
         let ydiff = py - y;
-        if ydiff > xdiff {
-            let yinc: f64 = -1.0;
-            let xinc = -(xdiff as f64 / (ydiff - 1) as f64);
-
-            let mut xcur = px as f64;
-            let mut ycur = py as f64;
-
-            loop {
-                let tile = map.at(xcur.round() as usize, ycur.round() as usize);
-                if tile.obstructing() {
-                    return false;
-                }
-                xcur = xcur + xinc;
-                ycur = ycur + yinc;
-                if ycur as usize == y {
-                    break;
-                }
+        match ydiff.cmp(&xdiff) {
+            Ordering::Less => {
+                let xinc: f64 = -1.0;
+                let yinc = -(ydiff as f64 / xdiff as f64);
+                (xinc, yinc)
             }
-            true
-        } else {
-            false
+            Ordering::Equal => {
+                let yinc: f64 = -1.0;
+                let xinc: f64 = -1.0;
+                (xinc, yinc)
+            }
+            Ordering::Greater => {
+                let yinc: f64 = -1.0;
+                let xinc = -(xdiff as f64 / ydiff as f64);
+                (xinc, yinc)
+            }
         }
     } else {
-        false
+        return false;
+    };
+
+    let mut xcur = px as f64;
+    let mut ycur = py as f64;
+
+    loop {
+        let tile = map.at(xcur.round() as usize, ycur.round() as usize);
+        if tile.obstructing() {
+            return false;
+        }
+        xcur = xcur + xinc;
+        ycur = ycur + yinc;
+
+        if xcur.round() as usize == x && ycur.round() as usize == y {
+            return true;
+        }
     }
 }
 
@@ -142,6 +153,13 @@ fn main() {
     map.set_at(4 + 4, 5, Tile::Wall);
     map.set_at(5 + 4, 5, Tile::Wall);
     map.set_at(6 + 4, 5, Tile::Wall);
+
+    // Another square in top left corner
+    map.set_at(2, 10, Tile::Wall);
+    map.set_at(2, 11, Tile::Wall);
+    map.set_at(2, 12, Tile::Wall);
+
+    map.set_at(10, 10, Tile::Wall);
 
     print_map(&map, px, py)
 }
