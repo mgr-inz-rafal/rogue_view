@@ -1,7 +1,8 @@
 use core::fmt;
-use std::{cmp::Ordering, io};
+use std::{cmp::Ordering, io, time::Duration};
 
 use crossterm::{
+    event::{poll, read, Event, KeyCode, KeyEventKind},
     execute,
     style::Stylize,
     terminal::{self, ClearType},
@@ -134,9 +135,25 @@ fn print_map(map: &Map, px: usize, py: usize) {
     }
 }
 
+fn get_key() -> KeyCode {
+    let _ = crossterm::terminal::enable_raw_mode();
+    loop {
+        if poll(Duration::from_millis(1000)).unwrap() {
+            let event = read().unwrap();
+            match event {
+                Event::Key(ev) if ev.kind == KeyEventKind::Press => {
+                    let _ = crossterm::terminal::disable_raw_mode();
+                    return ev.code;
+                }
+                _ => (),
+            }
+        }
+    }
+}
+
 fn main() {
-    let px = 15;
-    let py = 15;
+    let mut px = 15;
+    let mut py = 15;
 
     let mut map = Map::new(30, 20);
 
@@ -161,5 +178,16 @@ fn main() {
 
     map.set_at(10, 10, Tile::Wall);
 
-    print_map(&map, px, py)
+    loop {
+        print_map(&map, px, py);
+        let key = get_key();
+        match key {
+            KeyCode::Esc => break,
+            KeyCode::Left => px = px - 1,
+            KeyCode::Right => px = px + 1,
+            KeyCode::Up => py = py - 1,
+            KeyCode::Down => py = py + 1,
+            _ => (),
+        }
+    }
 }
