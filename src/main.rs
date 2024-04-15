@@ -70,29 +70,59 @@ impl fmt::Display for Map {
 }
 
 fn is_visible(x: usize, y: usize, px: usize, py: usize, map: &Map) -> bool {
-    let (xinc, yinc) = if x < px && y < py {
-        // Top-left corner
-        let xdiff = px - x;
-        let ydiff = py - y;
-        match ydiff.cmp(&xdiff) {
-            Ordering::Less => {
-                let xinc: f64 = -1.0;
-                let yinc = -(ydiff as f64 / xdiff as f64);
-                (xinc, yinc)
-            }
-            Ordering::Equal => {
-                let yinc: f64 = -1.0;
-                let xinc: f64 = -1.0;
-                (xinc, yinc)
-            }
-            Ordering::Greater => {
-                let yinc: f64 = -1.0;
-                let xinc = -(xdiff as f64 / ydiff as f64);
-                (xinc, yinc)
+    let xdiff = px as i32 - x as i32;
+    let xmul = if xdiff > 0 { -1.0 } else { 1.0 };
+    let xdiff = xdiff.abs();
+    let (xinc, yinc) = match (x.cmp(&px), y.cmp(&py)) {
+        (Ordering::Less, Ordering::Less) => {
+            // Top-left corner
+            let ydiff = (py - y) as i32;
+            match ydiff.cmp(&xdiff) {
+                Ordering::Less => {
+                    let xinc: f64 = 1.0 * xmul;
+                    let yinc = -(ydiff as f64 / xdiff as f64);
+                    (xinc, yinc)
+                }
+                Ordering::Equal => {
+                    let yinc: f64 = -1.0;
+                    let xinc: f64 = 1.0 * xmul;
+                    (xinc, yinc)
+                }
+                Ordering::Greater => {
+                    let yinc: f64 = -1.0;
+                    let xinc = (xdiff as f64 / ydiff as f64) * xmul;
+                    (xinc, yinc)
+                }
             }
         }
-    } else {
-        return false;
+        (Ordering::Less, Ordering::Equal) => return false,
+        (Ordering::Less, Ordering::Greater) => return false,
+        (Ordering::Equal, Ordering::Less) => return false,
+        (Ordering::Equal, Ordering::Equal) => return false,
+        (Ordering::Equal, Ordering::Greater) => return false,
+        (Ordering::Greater, Ordering::Less) => {
+            // Top-right corner
+            let ydiff = (py - y) as i32;
+            match ydiff.cmp(&xdiff) {
+                Ordering::Less => {
+                    let xinc: f64 = 1.0 * xmul;
+                    let yinc = -(ydiff as f64 / xdiff as f64);
+                    (xinc, yinc)
+                }
+                Ordering::Equal => {
+                    let yinc: f64 = -1.0;
+                    let xinc: f64 = 1.0 * xmul;
+                    (xinc, yinc)
+                }
+                Ordering::Greater => {
+                    let yinc: f64 = -1.0;
+                    let xinc = (xdiff as f64 / ydiff as f64) * xmul;
+                    (xinc, yinc)
+                }
+            }
+        }
+        (Ordering::Greater, Ordering::Equal) => return false,
+        (Ordering::Greater, Ordering::Greater) => return false,
     };
 
     let mut xcur = px as f64;
