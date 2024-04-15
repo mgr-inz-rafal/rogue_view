@@ -48,7 +48,7 @@ impl Map {
         self.width
     }
 
-    fn height(&self) -> usize {
+    fn _height(&self) -> usize {
         self.tiles.len() / self.width
     }
 }
@@ -116,8 +116,8 @@ fn is_visible(x: usize, y: usize, px: usize, py: usize, map: &Map) -> bool {
         if tile.obstructing() {
             return false;
         }
-        xcur = xcur + xinc;
-        ycur = ycur + yinc;
+        xcur += xinc;
+        ycur += yinc;
 
         if xcur.round() as usize == x && ycur.round() as usize == y {
             return true;
@@ -138,15 +138,13 @@ fn print_map(map: &Map, px: usize, py: usize) {
                 index,
                 if px == x && py == y {
                     "@".white()
-                } else {
-                    if is_visible(x, y, px, py, map) {
-                        match tile {
-                            Tile::Wall => "#".blue(),
-                            Tile::Air => ".".yellow(),
-                        }
-                    } else {
-                        "-".dark_blue()
+                } else if is_visible(x, y, px, py, map) {
+                    match tile {
+                        Tile::Wall => "#".blue(),
+                        Tile::Air => ".".yellow(),
                     }
+                } else {
+                    "-".dark_blue()
                 },
             )
         })
@@ -206,10 +204,10 @@ fn main() {
         let key = get_key();
         match key {
             KeyCode::Esc => break,
-            KeyCode::Left => px = px - 1,
-            KeyCode::Right => px = px + 1,
-            KeyCode::Up => py = py - 1,
-            KeyCode::Down => py = py + 1,
+            KeyCode::Left => px -= 1,
+            KeyCode::Right => px += 1,
+            KeyCode::Up => py -= 1,
+            KeyCode::Down => py += 1,
             _ => (),
         }
     }
