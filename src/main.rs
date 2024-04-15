@@ -69,9 +69,24 @@ impl fmt::Display for Map {
     }
 }
 
-fn is_visible(x: usize, y: usize, px: usize, py: usize, map: &Map) -> bool {
+fn distance(x1: i32, y1: i32, x2: i32, y2: i32) -> f64 {
+    let dx = x1 - x2;
+    let dy = y1 - y2;
+
+    let dxs = dx.pow(2);
+    let dys = dy.pow(2);
+
+    ((dxs + dys) as f64).sqrt()
+}
+
+fn is_visible(x: usize, y: usize, px: usize, py: usize, radius: Option<f64>, map: &Map) -> bool {
     if x == px && y == px {
         return true;
+    }
+    if let Some(radius) = radius {
+        if distance(x as i32, y as i32, px as i32, py as i32) > radius {
+            return false;
+        }
     }
 
     let xdiff = px as i32 - x as i32;
@@ -125,7 +140,7 @@ fn is_visible(x: usize, y: usize, px: usize, py: usize, map: &Map) -> bool {
     }
 }
 
-fn print_map(map: &Map, px: usize, py: usize) {
+fn print_map(map: &Map, px: usize, py: usize, radius: f64) {
     let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
 
     map.tiles
@@ -138,7 +153,7 @@ fn print_map(map: &Map, px: usize, py: usize) {
                 index,
                 if px == x && py == y {
                     "@".white()
-                } else if is_visible(x, y, px, py, map) {
+                } else if is_visible(x, y, px, py, Some(radius), map) {
                     match tile {
                         Tile::Wall => "#".blue(),
                         Tile::Air => ".".yellow(),
@@ -176,6 +191,8 @@ fn main() {
     let mut px = 15;
     let mut py = 15;
 
+    let mut radius = 5.0;
+
     let mut map = Map::new(30, 20);
 
     // Square in top left corner
@@ -200,7 +217,7 @@ fn main() {
     map.set_at(10, 10, Tile::Wall);
 
     loop {
-        print_map(&map, px, py);
+        print_map(&map, px, py, radius);
         let key = get_key();
         match key {
             KeyCode::Esc => break,
@@ -208,6 +225,8 @@ fn main() {
             KeyCode::Right => px += 1,
             KeyCode::Up => py -= 1,
             KeyCode::Down => py += 1,
+            KeyCode::PageUp => radius += 0.5,
+            KeyCode::PageDown => radius -= 0.5,
             _ => (),
         }
     }
