@@ -7,6 +7,7 @@ use crossterm::{
     style::Stylize,
     terminal::{self, ClearType},
 };
+use rand::Rng;
 
 #[derive(Clone)]
 enum Tile {
@@ -188,33 +189,20 @@ fn get_key() -> KeyCode {
 }
 
 fn main() {
+    let mut rng = rand::thread_rng();
+
     let mut px = 0;
     let mut py = 15;
-
     let mut radius = 5.0;
 
     let mut map = Map::new(30, 20);
+    let wall_count = rng.gen_range(10..100);
 
-    // Square in top left corner
-    map.set_at(3 + 4, 3, Tile::Wall);
-    map.set_at(4 + 4, 3, Tile::Wall);
-    map.set_at(5 + 4, 3, Tile::Wall);
-    map.set_at(6 + 4, 3, Tile::Wall);
-    map.set_at(3 + 4, 4, Tile::Wall);
-    map.set_at(4 + 4, 4, Tile::Wall);
-    map.set_at(5 + 4, 4, Tile::Wall);
-    map.set_at(6 + 4, 4, Tile::Wall);
-    map.set_at(3 + 4, 5, Tile::Wall);
-    map.set_at(4 + 4, 5, Tile::Wall);
-    map.set_at(5 + 4, 5, Tile::Wall);
-    map.set_at(6 + 4, 5, Tile::Wall);
-
-    // Another square in top left corner
-    map.set_at(2, 10, Tile::Wall);
-    map.set_at(2, 11, Tile::Wall);
-    map.set_at(2, 12, Tile::Wall);
-
-    map.set_at(10, 10, Tile::Wall);
+    (0..wall_count).for_each(|_| {
+        let x = rng.gen_range(0..30);
+        let y = rng.gen_range(0..20);
+        map.set_at(x, y, Tile::Wall);
+    });
 
     loop {
         print_map(&map, px, py, radius);
