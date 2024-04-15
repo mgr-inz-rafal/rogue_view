@@ -80,7 +80,7 @@ fn distance(x1: i32, y1: i32, x2: i32, y2: i32) -> f64 {
 }
 
 fn is_visible(x: usize, y: usize, px: usize, py: usize, radius: Option<f64>, map: &Map) -> bool {
-    if x == px && y == px {
+    if x == px && y == py {
         return true;
     }
     if let Some(radius) = radius {
@@ -188,7 +188,7 @@ fn get_key() -> KeyCode {
 }
 
 fn main() {
-    let mut px = 15;
+    let mut px = 0;
     let mut py = 15;
 
     let mut radius = 5.0;
