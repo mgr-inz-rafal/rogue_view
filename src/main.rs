@@ -97,13 +97,13 @@ fn is_visible(x: usize, y: usize, px: usize, py: usize, map: &Map) -> bool {
             (xinc, yinc)
         }
         Ordering::Equal => {
-            let yinc: f64 = 1.0 * ymul;
             let xinc: f64 = 1.0 * xmul;
+            let yinc: f64 = 1.0 * ymul;
             (xinc, yinc)
         }
         Ordering::Greater => {
-            let yinc: f64 = 1.0 * ymul;
             let xinc = (xdiff as f64 / ydiff as f64) * xmul;
+            let yinc: f64 = 1.0 * ymul;
             (xinc, yinc)
         }
     };
