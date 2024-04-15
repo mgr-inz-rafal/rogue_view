@@ -155,11 +155,11 @@ fn print_map(map: &Map, px: usize, py: usize, radius: f64) {
                     "@".white()
                 } else if is_visible(x, y, px, py, Some(radius), map) {
                     match tile {
-                        Tile::Wall => "#".blue(),
-                        Tile::Air => ".".yellow(),
+                        Tile::Wall => " ".on_red(),
+                        Tile::Air => "*".yellow(),
                     }
                 } else {
-                    "-".dark_blue()
+                    ".".dark_blue()
                 },
             )
         })
