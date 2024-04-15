@@ -127,25 +127,35 @@ fn is_visible(x: usize, y: usize, px: usize, py: usize, map: &Map) -> bool {
 
 fn print_map(map: &Map, px: usize, py: usize) {
     let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
-    for y in 0..map.height() {
-        for x in 0..map.width() {
-            let tile = map.at(x, y);
-            let c = if px == x && py == y {
-                "@".white()
-            } else {
-                if is_visible(x, y, px, py, map) {
-                    match tile {
-                        Tile::Wall => "#".blue(),
-                        Tile::Air => ".".yellow(),
-                    }
+
+    map.tiles
+        .iter()
+        .enumerate()
+        .map(|(index, tile)| {
+            let y = index / map.width();
+            let x = index - y * map.width();
+            (
+                index,
+                if px == x && py == y {
+                    "@".white()
                 } else {
-                    "-".dark_blue()
-                }
-            };
+                    if is_visible(x, y, px, py, map) {
+                        match tile {
+                            Tile::Wall => "#".blue(),
+                            Tile::Air => ".".yellow(),
+                        }
+                    } else {
+                        "-".dark_blue()
+                    }
+                },
+            )
+        })
+        .for_each(|(index, c)| {
             print!("{}", c);
-        }
-        println!()
-    }
+            if (index + 1) % map.width() == 0 {
+                println!();
+            }
+        });
 }
 
 fn get_key() -> KeyCode {
