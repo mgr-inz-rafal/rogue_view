@@ -1,13 +1,15 @@
 use core::fmt;
 use std::{
     cmp::Ordering,
+    f64::consts,
     fs::File,
-    io::{self, BufRead, BufReader},
+    io::{self, stdout, BufRead, BufReader, Write},
     path::Path,
     time::Duration,
 };
 
 use crossterm::{
+    cursor::{self, MoveTo},
     event::{poll, read, Event, KeyCode, KeyEventKind},
     execute,
     style::Stylize,
@@ -107,14 +109,35 @@ fn distance(x1: i32, y1: i32, x2: i32, y2: i32) -> f64 {
     ((dxs + dys) as f64).sqrt()
 }
 
-fn is_visible(x: usize, y: usize, px: usize, py: usize, radius: Option<f64>, map: &Map) -> bool {
+// TODO: Split into various checks. Execute from the cheapest to the most expensive.
+fn is_visible(
+    x: usize,
+    y: usize,
+    px: usize,
+    py: usize,
+    radius: Option<f64>,
+    map: &Map,
+    pa: f64,
+) -> bool {
     if x == px && y == py {
         return true;
     }
+
     if let Some(radius) = radius {
         if distance(x as i32, y as i32, px as i32, py as i32) > radius {
             return false;
         }
+    }
+
+    // TODO: Use FoV.
+    let dx = (x as i32 - px as i32) as f64;
+    let dy = (y as i32 - py as i32) as f64;
+    let atan = dy.atan2(dx) + consts::PI;
+    let left = reduce_angle(pa, consts::PI / 4.0);
+    let right = advance_angle(pa, consts::PI / 4.0);
+
+    if !is_between(atan, left, right) {
+        return false;
     }
 
     let xdiff = px as i32 - x as i32;
@@ -168,9 +191,9 @@ fn is_visible(x: usize, y: usize, px: usize, py: usize, radius: Option<f64>, map
     }
 }
 
-fn calculate_visibility(map: &Map, px: usize, py: usize, radius: f64) -> Vec<bool> {
+fn calculate_visibility(map: &Map, px: usize, py: usize, radius: f64, pa: f64) -> Vec<bool> {
     map.tiles
-        .par_iter()
+        .iter()
         .enumerate()
         .map(|(index, _)| {
             let y = index / map.width();
@@ -178,16 +201,16 @@ fn calculate_visibility(map: &Map, px: usize, py: usize, radius: f64) -> Vec<boo
             if px == x && py == y {
                 true
             } else {
-                is_visible(x, y, px, py, Some(radius), map)
+                is_visible(x, y, px, py, Some(radius), map, pa)
             }
         })
         .collect()
 }
 
-fn print_map(map: &Map, px: usize, py: usize, radius: f64) {
+fn print_map(map: &Map, px: usize, py: usize, radius: f64, pa: f64) {
     let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
 
-    let visibility_map = calculate_visibility(map, px, py, radius);
+    let visibility_map = calculate_visibility(map, px, py, radius, pa);
 
     map.tiles
         .iter()
@@ -237,13 +260,64 @@ fn get_key() -> KeyCode {
     }
 }
 
+fn to_deg(radians: f64) -> f64 {
+    radians * (180.0 / std::f64::consts::PI)
+}
+
+fn advance_angle(mut a: f64, step: f64) -> f64 {
+    a += step;
+    if a > std::f64::consts::PI * 2.0 {
+        a - std::f64::consts::PI * 2.0
+    } else {
+        a
+    }
+}
+
+fn reduce_angle(mut a: f64, step: f64) -> f64 {
+    a -= step;
+    if a < 0.0 {
+        a + std::f64::consts::PI * 2.0
+    } else {
+        a
+    }
+}
+
+fn is_between(a: f64, left: f64, right: f64) -> bool {
+    // dbg!(a);
+    // dbg!(left);
+    // dbg!(right);
+    // panic!();
+    if right < left {
+        (a < right && a >= 0.0) || (a <= 360.0 && a > left)
+    } else {
+        left < a && right > a
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use test_case::test_case;
+
+    use crate::is_between;
+
+    #[test_case(90.0, 45.0, 135.0 => true)]
+    #[test_case(0.0, 315.0, 45.0 => true)]
+    #[test_case(45.0, 0.0, 90.0 => true)]
+    #[test_case(315.0, 270.0, 360.0 => true)]
+    #[test_case(315.0, 270.0, 0.0 => true)]
+    fn between(a: f64, left: f64, right: f64) -> bool {
+        is_between(a, left, right)
+    }
+}
+
 fn main() {
     const WIDTH: usize = 128;
     const HEIGHT: usize = 64;
 
     let mut px = WIDTH / 2;
-    let mut py = HEIGHT / 2;
-    let mut radius = 5.0;
+    let mut py = HEIGHT / 2 - 10;
+    //let mut py = 2;
+    let mut radius = 15.0;
 
     // let mut map = Map::new(WIDTH, HEIGHT);
     // let wall_count = rng.gen_range(10..WIDTH * HEIGHT / 4);
@@ -253,11 +327,70 @@ fn main() {
     // map.set_at(x, y, Tile::Wall);
     // });
 
+    // let mut px = 10;
+    // let mut py = 10;
+
+    // let mut i = 0;
+    // let xx = vec![8, 9, 10, 11, 12, 12, 12, 12, 12, 11, 10, 9, 8, 8, 8, 8];
+    // let yy = vec![8, 8, 8, 8, 8, 9, 10, 11, 12, 12, 12, 12, 12, 11, 10, 9];
+
+    let mut pa = consts::PI;
+    let mut left = pa - consts::PI / 4.0;
+    let mut right = pa + consts::PI / 4.0;
+
+    let mut stdout = stdout();
+    /*
+         loop {
+            let x = xx[i];
+            let y = yy[i];
+            let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
+            let _ = execute!(stdout, MoveTo(px, py));
+            println!("@");
+            let _ = execute!(stdout, MoveTo(x, y));
+            println!("*");
+
+            let _ = execute!(stdout, MoveTo(0, 15));
+
+            let dx = (x as i32 - px as i32) as f64;
+            let dy = (y as i32 - py as i32) as f64;
+            let atan = dy.atan2(dx);
+            println!("atan={atan} ({})", to_deg(atan));
+            let matan = atan + std::f64::consts::PI;
+            println!("matan={matan} ({})", to_deg(matan));
+            println!("pa={pa} ({})", to_deg(pa));
+
+            println!("left={left} ({})", to_deg(left));
+            println!("right={right} ({})", to_deg(right));
+
+            let key = get_key();
+            match key {
+                KeyCode::Esc => break,
+                KeyCode::PageUp => {
+                    pa = advance_angle(pa, std::f64::consts::PI / 8.0);
+                    left = advance_angle(left, std::f64::consts::PI / 8.0);
+                    right = advance_angle(right, std::f64::consts::PI / 8.0);
+                }
+                KeyCode::PageDown => {
+                    pa = reduce_angle(pa, std::f64::consts::PI / 8.0);
+                    left = reduce_angle(left, std::f64::consts::PI / 8.0);
+                    right = reduce_angle(right, std::f64::consts::PI / 8.0);
+                }
+                KeyCode::Char(' ') => {
+                    i += 1;
+                    if i == xx.len() {
+                        i = 0;
+                    }
+                }
+                _ => (),
+            }
+        }
+    */
+
     let map = Map::from_file("maps/rust.txt");
 
     loop {
-        calculate_visibility(&map, px, py, radius);
-        print_map(&map, px, py, radius);
+        calculate_visibility(&map, px, py, radius, pa);
+        print_map(&map, px, py, radius, pa);
         let key = get_key();
         match key {
             KeyCode::Esc => break,
@@ -267,6 +400,8 @@ fn main() {
             KeyCode::Down => py += 1,
             KeyCode::PageUp => radius += 0.5,
             KeyCode::PageDown => radius -= 0.5,
+            KeyCode::Home => pa = advance_angle(pa, consts::PI / 16.0),
+            KeyCode::End => pa = reduce_angle(pa, consts::PI / 16.0),
             _ => (),
         }
     }
