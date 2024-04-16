@@ -1,5 +1,11 @@
 use core::fmt;
-use std::{cmp::Ordering, io, time::Duration};
+use std::{
+    cmp::Ordering,
+    fs::File,
+    io::{self, BufRead, BufReader},
+    path::Path,
+    time::Duration,
+};
 
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEventKind},
@@ -7,7 +13,6 @@ use crossterm::{
     style::Stylize,
     terminal::{self, ClearType},
 };
-use rand::Rng;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 #[derive(Clone)]
@@ -38,8 +43,29 @@ impl Map {
         }
     }
 
-    fn set_at(&mut self, x: usize, y: usize, tile: Tile) {
-        self.tiles[y * self.width + x] = tile
+    fn from_file<P: AsRef<Path>>(path: P) -> Self {
+        let file = File::open(path).expect("cannot open file");
+        let reader = BufReader::new(file);
+
+        let lines: Vec<_> = reader
+            .lines()
+            .map(|line| line.expect("cannot read line"))
+            .collect();
+
+        let first_line = lines.first().expect("empty file");
+        let width = first_line.len();
+
+        let mut map = Self::new(width, lines.len());
+        for line in lines {
+            for c in line.chars() {
+                let tile = match c {
+                    ' ' => Tile::Air,
+                    _ => Tile::Wall,
+                };
+                map.tiles.push(tile);
+            }
+        }
+        map
     }
 
     fn at(&self, x: usize, y: usize) -> &Tile {
@@ -180,7 +206,10 @@ fn print_map(map: &Map, px: usize, py: usize, radius: f64) {
                         Tile::Air => "*".yellow(),
                     }
                 } else {
-                    ".".dark_blue()
+                    match tile {
+                        Tile::Wall => "#".dark_blue(),
+                        Tile::Air => " ".black()
+                    }
                 },
             )
         })
@@ -212,20 +241,19 @@ fn main() {
     const WIDTH: usize = 128;
     const HEIGHT: usize = 64;
 
-    let mut rng = rand::thread_rng();
-
     let mut px = WIDTH / 2;
     let mut py = HEIGHT / 2;
     let mut radius = 5.0;
 
-    let mut map = Map::new(WIDTH, HEIGHT);
-    let wall_count = rng.gen_range(10..WIDTH * HEIGHT / 4);
+    // let mut map = Map::new(WIDTH, HEIGHT);
+    // let wall_count = rng.gen_range(10..WIDTH * HEIGHT / 4);
+    // (0..wall_count).for_each(|_| {
+    // let x = rng.gen_range(0..WIDTH);
+    // let y = rng.gen_range(0..HEIGHT);
+    // map.set_at(x, y, Tile::Wall);
+    // });
 
-    (0..wall_count).for_each(|_| {
-        let x = rng.gen_range(0..WIDTH);
-        let y = rng.gen_range(0..HEIGHT);
-        map.set_at(x, y, Tile::Wall);
-    });
+    let map = Map::from_file("maps/rust.txt");
 
     loop {
         calculate_visibility(&map, px, py, radius);

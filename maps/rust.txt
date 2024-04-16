@@ -1,0 +1,25 @@
+                                                                                                       
+                                                                                                       
+RRRRRRRRRRRRRRRRR        UUUUUUUU     UUUUUUUU        SSSSSSSSSSSSSSS      TTTTTTTTTTTTTTTTTTTTTTT     
+R::::::::::::::::R       U::::::U     U::::::U      SS:::::::::::::::S     T:::::::::::::::::::::T     
+R::::::RRRRRR:::::R      U::::::U     U::::::U     S:::::SSSSSS::::::S     T:::::::::::::::::::::T     
+RR:::::R     R:::::R     UU:::::U     U:::::UU     S:::::S     SSSSSSS     T:::::TT:::::::TT:::::T     
+  R::::R     R:::::R      U:::::U     U:::::U      S:::::S                 TTTTTT  T:::::T  TTTTTT     
+  R::::R     R:::::R      U:::::D     D:::::U      S:::::S                         T:::::T             
+  R::::RRRRRR:::::R       U:::::D     D:::::U       S::::SSSS                      T:::::T             
+  R:::::::::::::RR        U:::::D     D:::::U        SS::::::SSSSS                 T:::::T             
+  R::::RRRRRR:::::R       U:::::D     D:::::U          SSS::::::::SS               T:::::T             
+  R::::R     R:::::R      U:::::D     D:::::U             SSSSSS::::S              T:::::T             
+  R::::R     R:::::R      U:::::D     D:::::U                  S:::::S             T:::::T             
+  R::::R     R:::::R      U::::::U   U::::::U                  S:::::S             T:::::T             
+RR:::::R     R:::::R      U:::::::UUU:::::::U      SSSSSSS     S:::::S           TT:::::::TT           
+R::::::R     R:::::R       UU:::::::::::::UU       S::::::SSSSSS:::::S           T:::::::::T           
+R::::::R     R:::::R         UU:::::::::UU         S:::::::::::::::SS            T:::::::::T           
+RRRRRRRR     RRRRRRR           UUUUUUUUU            SSSSSSSSSSSSSSS              TTTTTTTTTTT           
+                                                                                                       
+                                                                                                       
+                                                                                                       
+                                                                                                       
+                                                                                                       
+                                                                                                       
+                                                                                                       
