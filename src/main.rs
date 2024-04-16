@@ -17,14 +17,14 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 
 #[derive(Clone)]
 enum Tile {
-    Wall,
+    Wall(char),
     Air,
 }
 
 impl Tile {
     fn obstructing(&self) -> bool {
         match self {
-            Tile::Wall => true,
+            Tile::Wall(_) => true,
             Tile::Air => false,
         }
     }
@@ -60,7 +60,7 @@ impl Map {
             for c in line.chars() {
                 let tile = match c {
                     ' ' => Tile::Air,
-                    _ => Tile::Wall,
+                    c => Tile::Wall(c),
                 };
                 map.tiles.push(tile);
             }
@@ -85,8 +85,8 @@ impl fmt::Display for Map {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (index, tile) in self.tiles.iter().enumerate() {
             let c = match tile {
-                Tile::Wall => "#".blue(),
-                Tile::Air => ".".yellow(),
+                Tile::Wall(c) => c.blue(),
+                Tile::Air => '.'.yellow(),
             };
             write!(f, "{}", c)?;
             if (index + 1) % self.width == 0 {
@@ -199,16 +199,16 @@ fn print_map(map: &Map, px: usize, py: usize, radius: f64) {
             (
                 index,
                 if px == x && py == y {
-                    "@".white()
+                    '@'.black().on_white()
                 } else if *visible {
                     match tile {
-                        Tile::Wall => " ".on_red(),
-                        Tile::Air => "*".yellow(),
+                        Tile::Wall(c) => c.on_red(),
+                        Tile::Air => '*'.yellow(),
                     }
                 } else {
                     match tile {
-                        Tile::Wall => "#".dark_blue(),
-                        Tile::Air => " ".black()
+                        Tile::Wall(c) => c.dark_blue(),
+                        Tile::Air => ' '.black(),
                     }
                 },
             )
