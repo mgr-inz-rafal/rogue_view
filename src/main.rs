@@ -141,20 +141,41 @@ fn is_visible(x: usize, y: usize, px: usize, py: usize, radius: Option<f64>, map
     }
 }
 
-fn print_map(map: &Map, px: usize, py: usize, radius: f64) {
-    let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
-
+fn calculate_visibility(map: &Map, px: usize, py: usize, radius: f64) -> Vec<bool> {
     map.tiles
         .iter()
         .enumerate()
-        .map(|(index, tile)| {
+        .map(|(index, _)| {
+            let y = index / map.width();
+            let x = index - y * map.width();
+            if px == x && py == y {
+                true
+            } else if is_visible(x, y, px, py, Some(radius), map) {
+                true
+            } else {
+                false
+            }
+        })
+        .collect()
+}
+
+fn print_map(map: &Map, px: usize, py: usize, radius: f64) {
+    let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
+
+    let visibility_map = calculate_visibility(map, px, py, radius);
+
+    map.tiles
+        .iter()
+        .zip(visibility_map.iter())
+        .enumerate()
+        .map(|(index, (tile, visible))| {
             let y = index / map.width();
             let x = index - y * map.width();
             (
                 index,
                 if px == x && py == y {
                     "@".white()
-                } else if is_visible(x, y, px, py, Some(radius), map) {
+                } else if *visible {
                     match tile {
                         Tile::Wall => " ".on_red(),
                         Tile::Air => "*".yellow(),
@@ -205,6 +226,7 @@ fn main() {
     });
 
     loop {
+        calculate_visibility(&map, px, py, radius);
         print_map(&map, px, py, radius);
         let key = get_key();
         match key {
