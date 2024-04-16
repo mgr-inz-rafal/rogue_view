@@ -8,6 +8,7 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 use rand::Rng;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 #[derive(Clone)]
 enum Tile {
@@ -143,17 +144,15 @@ fn is_visible(x: usize, y: usize, px: usize, py: usize, radius: Option<f64>, map
 
 fn calculate_visibility(map: &Map, px: usize, py: usize, radius: f64) -> Vec<bool> {
     map.tiles
-        .iter()
+        .par_iter()
         .enumerate()
         .map(|(index, _)| {
             let y = index / map.width();
             let x = index - y * map.width();
             if px == x && py == y {
                 true
-            } else if is_visible(x, y, px, py, Some(radius), map) {
-                true
             } else {
-                false
+                is_visible(x, y, px, py, Some(radius), map)
             }
         })
         .collect()
@@ -210,18 +209,21 @@ fn get_key() -> KeyCode {
 }
 
 fn main() {
+    const WIDTH: usize = 128;
+    const HEIGHT: usize = 64;
+
     let mut rng = rand::thread_rng();
 
-    let mut px = 0;
-    let mut py = 15;
+    let mut px = WIDTH / 2;
+    let mut py = HEIGHT / 2;
     let mut radius = 5.0;
 
-    let mut map = Map::new(30, 20);
-    let wall_count = rng.gen_range(10..100);
+    let mut map = Map::new(WIDTH, HEIGHT);
+    let wall_count = rng.gen_range(10..WIDTH * HEIGHT / 4);
 
     (0..wall_count).for_each(|_| {
-        let x = rng.gen_range(0..30);
-        let y = rng.gen_range(0..20);
+        let x = rng.gen_range(0..WIDTH);
+        let y = rng.gen_range(0..HEIGHT);
         map.set_at(x, y, Tile::Wall);
     });
 
