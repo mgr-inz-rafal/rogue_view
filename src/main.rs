@@ -236,18 +236,15 @@ fn cast_ray(a: &Pos, b: &Pos, map: &Map) -> bool {
     };
     let mut xcur = a.x as f64;
     let mut ycur = a.y as f64;
-    loop {
+    while !(xcur.round() as usize == b.x as usize && ycur.round() as usize == b.y as usize) {
         let tile = map.at(xcur.round() as usize, ycur.round() as usize);
         if tile.obstructing() {
             return false;
         }
         xcur += xinc;
         ycur += yinc;
-
-        if xcur.round() as usize == b.x as usize && ycur.round() as usize == b.y as usize {
-            return true;
-        }
     }
+    true
 }
 
 fn is_within_fov<A>(actor: &A, point: &Pos, light: &LightSpec) -> bool
