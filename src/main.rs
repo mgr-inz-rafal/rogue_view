@@ -118,6 +118,7 @@ fn is_visible(
     radius: Option<f64>,
     map: &Map,
     pa: f64,
+    pfov: f64,
 ) -> bool {
     if x == px && y == py {
         return true;
@@ -130,11 +131,11 @@ fn is_visible(
     }
 
     // TODO: Use FoV.
-    let dx = (x as i32 - px as i32) as f64;
+    let dx = (px as i32 - x as i32) as f64;
     let dy = (y as i32 - py as i32) as f64;
     let atan = dy.atan2(dx) + consts::PI;
-    let left = reduce_angle(pa, consts::PI / 4.0);
-    let right = advance_angle(pa, consts::PI / 4.0);
+    let left = reduce_angle(pa, pfov / 2.0);
+    let right = advance_angle(pa, pfov / 2.0);
 
     if !is_between(atan, left, right) {
         return false;
@@ -191,7 +192,14 @@ fn is_visible(
     }
 }
 
-fn calculate_visibility(map: &Map, px: usize, py: usize, radius: f64, pa: f64) -> Vec<bool> {
+fn calculate_visibility(
+    map: &Map,
+    px: usize,
+    py: usize,
+    radius: f64,
+    pa: f64,
+    pfov: f64,
+) -> Vec<bool> {
     map.tiles
         .iter()
         .enumerate()
@@ -201,16 +209,16 @@ fn calculate_visibility(map: &Map, px: usize, py: usize, radius: f64, pa: f64) -
             if px == x && py == y {
                 true
             } else {
-                is_visible(x, y, px, py, Some(radius), map, pa)
+                is_visible(x, y, px, py, Some(radius), map, pa, pfov)
             }
         })
         .collect()
 }
 
-fn print_map(map: &Map, px: usize, py: usize, radius: f64, pa: f64) {
+fn print_map(map: &Map, px: usize, py: usize, radius: f64, pa: f64, pfov: f64) {
     let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
 
-    let visibility_map = calculate_visibility(map, px, py, radius, pa);
+    let visibility_map = calculate_visibility(map, px, py, radius, pa, pfov);
 
     map.tiles
         .iter()
@@ -314,6 +322,7 @@ fn main() {
     const WIDTH: usize = 128;
     const HEIGHT: usize = 64;
 
+    let mut pfov = consts::PI / 4.0;
     let mut px = WIDTH / 2;
     let mut py = HEIGHT / 2 - 10;
     //let mut py = 2;
@@ -389,8 +398,8 @@ fn main() {
     let map = Map::from_file("maps/rust.txt");
 
     loop {
-        calculate_visibility(&map, px, py, radius, pa);
-        print_map(&map, px, py, radius, pa);
+        calculate_visibility(&map, px, py, radius, pa, pfov);
+        print_map(&map, px, py, radius, pa, pfov);
         let key = get_key();
         match key {
             KeyCode::Esc => break,
@@ -402,6 +411,8 @@ fn main() {
             KeyCode::PageDown => radius -= 0.5,
             KeyCode::Home => pa = advance_angle(pa, consts::PI / 16.0),
             KeyCode::End => pa = reduce_angle(pa, consts::PI / 16.0),
+            KeyCode::Insert => pfov -= 0.11,
+            KeyCode::Delete => pfov += 0.11,
             _ => (),
         }
     }
