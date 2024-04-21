@@ -3,13 +3,12 @@ use std::{
     cmp::Ordering,
     f64::consts,
     fs::File,
-    io::{self, stdout, BufRead, BufReader, Write},
+    io::{self, BufRead, BufReader},
     path::Path,
     time::Duration,
 };
 
 use crossterm::{
-    cursor::{self, MoveTo},
     event::{poll, read, Event, KeyCode, KeyEventKind},
     execute,
     style::Stylize,
@@ -99,49 +98,110 @@ impl fmt::Display for Map {
     }
 }
 
-fn distance(x1: i32, y1: i32, x2: i32, y2: i32) -> f64 {
-    let dx = x1 - x2;
-    let dy = y1 - y2;
+fn distance(a: &Pos, b: &Pos) -> f64 {
+    let dx = a.x as i32 - b.x as i32;
+    let dy = a.y as i32 - b.y as i32;
 
-    let dxs = dx.pow(2);
-    let dys = dy.pow(2);
+    let dxs = dx * dx;
+    let dys = dy * dy;
 
     ((dxs + dys) as f64).sqrt()
 }
 
-// TODO: Split into various checks. Execute from the cheapest to the most expensive.
-fn is_visible(
-    x: usize,
-    y: usize,
-    px: usize,
-    py: usize,
-    radius: Option<f64>,
-    map: &Map,
-    pa: f64,
-    pfov: f64,
-) -> bool {
-    if x == px && y == py {
-        return true;
+#[derive(PartialEq)]
+struct Pos {
+    x: u32,
+    y: u32,
+}
+
+impl Pos {
+    fn new(x: u32, y: u32) -> Self {
+        Self { x, y }
+    }
+}
+
+struct LightSpec {
+    radius: f64,
+    width: f64,
+}
+
+impl LightSpec {
+    fn new(radius: f64, width: f64) -> Self {
+        Self { radius, width }
+    }
+}
+
+trait Actor {
+    fn pos(&self) -> &Pos;
+    fn angle(&self) -> f64;
+    fn light(&self) -> Option<&LightSpec>;
+}
+
+struct Player {
+    pos: Pos,
+    angle: f64,
+    light: Option<LightSpec>,
+}
+
+impl Actor for Player {
+    fn pos(&self) -> &Pos {
+        &self.pos
     }
 
-    if let Some(radius) = radius {
-        if distance(x as i32, y as i32, px as i32, py as i32) > radius {
-            return false;
+    fn angle(&self) -> f64 {
+        self.angle
+    }
+
+    fn light(&self) -> Option<&LightSpec> {
+        self.light.as_ref()
+    }
+}
+
+impl Player {
+    fn _new(pos: Pos, angle: f64) -> Self {
+        Self {
+            pos,
+            angle,
+            light: None,
         }
     }
 
-    // TODO: Use FoV.
-    let dx = (px as i32 - x as i32) as f64;
-    let dy = (y as i32 - py as i32) as f64;
-    let atan = dy.atan2(dx) + consts::PI;
-    let left = reduce_angle(pa, pfov / 2.0);
-    let right = advance_angle(pa, pfov / 2.0);
+    fn new_with_light(pos: Pos, angle: f64, light: LightSpec) -> Self {
+        Self {
+            pos,
+            angle,
+            light: Some(light),
+        }
+    }
+}
 
-    if !is_between(atan, left, right) {
+// TODO: Split into various checks. Execute from the cheapest to the most expensive.
+fn is_visible<A>(map: &Map, actor: &A, point: &Pos) -> bool
+where
+    A: Actor,
+{
+    if actor.pos() == point {
+        return true;
+    }
+
+    let Some(light) = actor.light() else {
+        return false;
+    };
+    if distance(point, actor.pos()) > light.radius {
         return false;
     }
 
-    let xdiff = px as i32 - x as i32;
+    let dx = (actor.pos().x as i32 - point.x as i32) as f64;
+    let dy = (point.y as i32 - actor.pos().y as i32) as f64;
+    let atan = dy.atan2(dx) + consts::PI;
+    let left = reduce_angle(actor.angle(), light.width / 2.0);
+    let right = advance_angle(actor.angle(), light.width / 2.0);
+
+    if !is_angle_between(atan, left, right) {
+        return false;
+    }
+
+    let xdiff = actor.pos().x as i32 - point.x as i32;
     let xmul = match xdiff.cmp(&0) {
         Ordering::Less => 1.0,
         Ordering::Equal => 0.0,
@@ -149,7 +209,7 @@ fn is_visible(
     };
     let xdiff = xdiff.abs();
 
-    let ydiff = py as i32 - y as i32;
+    let ydiff = actor.pos().y as i32 - point.y as i32;
     let ymul = match ydiff.cmp(&0) {
         Ordering::Less => 1.0,
         Ordering::Equal => 0.0,
@@ -175,8 +235,8 @@ fn is_visible(
         }
     };
 
-    let mut xcur = px as f64;
-    let mut ycur = py as f64;
+    let mut xcur = actor.pos().x as f64;
+    let mut ycur = actor.pos().y as f64;
 
     loop {
         let tile = map.at(xcur.round() as usize, ycur.round() as usize);
@@ -186,39 +246,38 @@ fn is_visible(
         xcur += xinc;
         ycur += yinc;
 
-        if xcur.round() as usize == x && ycur.round() as usize == y {
+        if xcur.round() as usize == point.x as usize && ycur.round() as usize == point.y as usize {
             return true;
         }
     }
 }
 
-fn calculate_visibility(
-    map: &Map,
-    px: usize,
-    py: usize,
-    radius: f64,
-    pa: f64,
-    pfov: f64,
-) -> Vec<bool> {
+fn calculate_visibility<A>(map: &Map, actor: &A) -> Vec<bool>
+where
+    A: Actor,
+{
     map.tiles
         .iter()
         .enumerate()
         .map(|(index, _)| {
             let y = index / map.width();
             let x = index - y * map.width();
-            if px == x && py == y {
+            if actor.pos().x == x as u32 && actor.pos().y == y as u32 {
                 true
             } else {
-                is_visible(x, y, px, py, Some(radius), map, pa, pfov)
+                is_visible(map, actor, &Pos::new(x as u32, y as u32))
             }
         })
         .collect()
 }
 
-fn print_map(map: &Map, px: usize, py: usize, radius: f64, pa: f64, pfov: f64) {
+fn print_map<A>(map: &Map, actor: &A)
+where
+    A: Actor,
+{
     let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
 
-    let visibility_map = calculate_visibility(map, px, py, radius, pa, pfov);
+    let visibility_map = calculate_visibility(map, actor);
 
     map.tiles
         .iter()
@@ -229,7 +288,7 @@ fn print_map(map: &Map, px: usize, py: usize, radius: f64, pa: f64, pfov: f64) {
             let x = index - y * map.width();
             (
                 index,
-                if px == x && py == y {
+                if actor.pos().x == x as u32 && actor.pos().y == y as u32 {
                     '@'.black().on_white()
                 } else if *visible {
                     match tile {
@@ -268,10 +327,6 @@ fn get_key() -> KeyCode {
     }
 }
 
-fn to_deg(radians: f64) -> f64 {
-    radians * (180.0 / std::f64::consts::PI)
-}
-
 fn advance_angle(mut a: f64, step: f64) -> f64 {
     a += step;
     if a > std::f64::consts::PI * 2.0 {
@@ -290,13 +345,9 @@ fn reduce_angle(mut a: f64, step: f64) -> f64 {
     }
 }
 
-fn is_between(a: f64, left: f64, right: f64) -> bool {
-    // dbg!(a);
-    // dbg!(left);
-    // dbg!(right);
-    // panic!();
+fn is_angle_between(a: f64, left: f64, right: f64) -> bool {
     if right < left {
-        (a < right && a >= 0.0) || (a <= 360.0 && a > left)
+        (a < right && a >= 0.0) || (a <= 2.0 * consts::PI && a > left)
     } else {
         left < a && right > a
     }
@@ -304,17 +355,23 @@ fn is_between(a: f64, left: f64, right: f64) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts;
+
     use test_case::test_case;
 
-    use crate::is_between;
+    use crate::is_angle_between;
 
-    #[test_case(90.0, 45.0, 135.0 => true)]
-    #[test_case(0.0, 315.0, 45.0 => true)]
-    #[test_case(45.0, 0.0, 90.0 => true)]
-    #[test_case(315.0, 270.0, 360.0 => true)]
-    #[test_case(315.0, 270.0, 0.0 => true)]
+    #[test_case(5.0, 4.0, 6.0 => true; "inside")]
+    #[test_case(5.0, 6.0, 7.0 => false; "outside - left")]
+    #[test_case(5.0, 3.0, 4.0 => false; "outside - right")]
+    #[test_case(0.0, 1.0, 2.0 => false; "outside - left - at 0")]
+    #[test_case(0.0, -2.0, -1.0 => false; "outside - right - at 0")]
+    #[test_case(0.0, -1.0, 1.0 => true; "inside - at 0")]
+    #[test_case(1.0, 0.0, 2.0 => true; "inside - at 0 left border")]
+    #[test_case(-1.0, -2.0, 0.0 => true; "inside - at 0 right border")]
+    #[test_case(6.28, 6.18, 0.1 => true; "inside - at PI looping #1")]
     fn between(a: f64, left: f64, right: f64) -> bool {
-        is_between(a, left, right)
+        is_angle_between(a, left, right)
     }
 }
 
@@ -322,97 +379,54 @@ fn main() {
     const WIDTH: usize = 128;
     const HEIGHT: usize = 64;
 
-    let mut pfov = consts::PI / 4.0;
-    let mut px = WIDTH / 2;
-    let mut py = HEIGHT / 2 - 10;
-    //let mut py = 2;
-    let mut radius = 15.0;
-
-    // let mut map = Map::new(WIDTH, HEIGHT);
-    // let wall_count = rng.gen_range(10..WIDTH * HEIGHT / 4);
-    // (0..wall_count).for_each(|_| {
-    // let x = rng.gen_range(0..WIDTH);
-    // let y = rng.gen_range(0..HEIGHT);
-    // map.set_at(x, y, Tile::Wall);
-    // });
-
-    // let mut px = 10;
-    // let mut py = 10;
-
-    // let mut i = 0;
-    // let xx = vec![8, 9, 10, 11, 12, 12, 12, 12, 12, 11, 10, 9, 8, 8, 8, 8];
-    // let yy = vec![8, 8, 8, 8, 8, 9, 10, 11, 12, 12, 12, 12, 12, 11, 10, 9];
-
-    let mut pa = consts::PI;
-    let mut left = pa - consts::PI / 4.0;
-    let mut right = pa + consts::PI / 4.0;
-
-    let mut stdout = stdout();
-    /*
-         loop {
-            let x = xx[i];
-            let y = yy[i];
-            let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
-            let _ = execute!(stdout, MoveTo(px, py));
-            println!("@");
-            let _ = execute!(stdout, MoveTo(x, y));
-            println!("*");
-
-            let _ = execute!(stdout, MoveTo(0, 15));
-
-            let dx = (x as i32 - px as i32) as f64;
-            let dy = (y as i32 - py as i32) as f64;
-            let atan = dy.atan2(dx);
-            println!("atan={atan} ({})", to_deg(atan));
-            let matan = atan + std::f64::consts::PI;
-            println!("matan={matan} ({})", to_deg(matan));
-            println!("pa={pa} ({})", to_deg(pa));
-
-            println!("left={left} ({})", to_deg(left));
-            println!("right={right} ({})", to_deg(right));
-
-            let key = get_key();
-            match key {
-                KeyCode::Esc => break,
-                KeyCode::PageUp => {
-                    pa = advance_angle(pa, std::f64::consts::PI / 8.0);
-                    left = advance_angle(left, std::f64::consts::PI / 8.0);
-                    right = advance_angle(right, std::f64::consts::PI / 8.0);
-                }
-                KeyCode::PageDown => {
-                    pa = reduce_angle(pa, std::f64::consts::PI / 8.0);
-                    left = reduce_angle(left, std::f64::consts::PI / 8.0);
-                    right = reduce_angle(right, std::f64::consts::PI / 8.0);
-                }
-                KeyCode::Char(' ') => {
-                    i += 1;
-                    if i == xx.len() {
-                        i = 0;
-                    }
-                }
-                _ => (),
-            }
-        }
-    */
+    let mut player = Player::new_with_light(
+        Pos::new(WIDTH as u32 / 2, HEIGHT as u32 / 2),
+        consts::PI,
+        LightSpec::new(15.0, consts::PI / 4.0),
+    );
 
     let map = Map::from_file("maps/rust.txt");
 
     loop {
-        calculate_visibility(&map, px, py, radius, pa, pfov);
-        print_map(&map, px, py, radius, pa, pfov);
+        calculate_visibility(&map, &player);
+        print_map(&map, &player);
         let key = get_key();
         match key {
             KeyCode::Esc => break,
-            KeyCode::Left => px -= 1,
-            KeyCode::Right => px += 1,
-            KeyCode::Up => py -= 1,
-            KeyCode::Down => py += 1,
-            KeyCode::PageUp => radius += 0.5,
-            KeyCode::PageDown => radius -= 0.5,
-            KeyCode::Home => pa = advance_angle(pa, consts::PI / 16.0),
-            KeyCode::End => pa = reduce_angle(pa, consts::PI / 16.0),
-            KeyCode::Insert => pfov -= 0.11,
-            KeyCode::Delete => pfov += 0.11,
+            KeyCode::Left => player.pos.x -= 1,
+            KeyCode::Right => player.pos.x += 1,
+            KeyCode::Up => player.pos.y -= 1,
+            KeyCode::Down => player.pos.y += 1,
+            KeyCode::PageUp => match player.light {
+                None => (),
+                Some(mut light) => {
+                    light.radius += 0.5;
+                    player.light = Some(light)
+                }
+            },
+            KeyCode::PageDown => match player.light {
+                None => (),
+                Some(mut light) => {
+                    light.radius -= 0.5;
+                    player.light = Some(light)
+                }
+            },
+            KeyCode::Home => player.angle = advance_angle(player.angle, consts::PI / 16.0),
+            KeyCode::End => player.angle = reduce_angle(player.angle, consts::PI / 16.0),
+            KeyCode::Insert => match player.light {
+                None => (),
+                Some(mut light) => {
+                    light.width += 0.11;
+                    player.light = Some(light)
+                }
+            },
+            KeyCode::Delete => match player.light {
+                None => (),
+                Some(mut light) => {
+                    light.width -= 0.11;
+                    player.light = Some(light)
+                }
+            },
             _ => (),
         }
     }
