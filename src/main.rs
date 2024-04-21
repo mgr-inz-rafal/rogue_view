@@ -195,22 +195,28 @@ where
         return false;
     }
 
-    let xdiff = actor.pos().x as i32 - point.x as i32;
+    if !cast_ray(actor.pos(), point, map) {
+        return false;
+    }
+
+    true
+}
+
+fn cast_ray(a: &Pos, b: &Pos, map: &Map) -> bool {
+    let xdiff = a.x as i32 - b.x as i32;
     let xmul = match xdiff.cmp(&0) {
         Ordering::Less => 1.0,
         Ordering::Equal => 0.0,
         Ordering::Greater => -1.0,
     };
     let xdiff = xdiff.abs();
-
-    let ydiff = actor.pos().y as i32 - point.y as i32;
+    let ydiff = a.y as i32 - b.y as i32;
     let ymul = match ydiff.cmp(&0) {
         Ordering::Less => 1.0,
         Ordering::Equal => 0.0,
         Ordering::Greater => -1.0,
     };
     let ydiff = ydiff.abs();
-
     let (xinc, yinc) = match ydiff.cmp(&xdiff) {
         Ordering::Less => {
             let xinc: f64 = 1.0 * xmul;
@@ -228,10 +234,8 @@ where
             (xinc, yinc)
         }
     };
-
-    let mut xcur = actor.pos().x as f64;
-    let mut ycur = actor.pos().y as f64;
-
+    let mut xcur = a.x as f64;
+    let mut ycur = a.y as f64;
     loop {
         let tile = map.at(xcur.round() as usize, ycur.round() as usize);
         if tile.obstructing() {
@@ -240,7 +244,7 @@ where
         xcur += xinc;
         ycur += yinc;
 
-        if xcur.round() as usize == point.x as usize && ycur.round() as usize == point.y as usize {
+        if xcur.round() as usize == b.x as usize && ycur.round() as usize == b.y as usize {
             return true;
         }
     }
