@@ -360,26 +360,6 @@ fn is_angle_between(a: f64, left: f64, right: f64) -> bool {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use test_case::test_case;
-
-    use crate::is_angle_between;
-
-    #[test_case(5.0, 4.0, 6.0 => true; "inside")]
-    #[test_case(5.0, 6.0, 7.0 => false; "outside - left")]
-    #[test_case(5.0, 3.0, 4.0 => false; "outside - right")]
-    #[test_case(0.0, 1.0, 2.0 => false; "outside - left - at 0")]
-    #[test_case(0.0, -2.0, -1.0 => false; "outside - right - at 0")]
-    #[test_case(0.0, -1.0, 1.0 => true; "inside - at 0")]
-    #[test_case(1.0, 0.0, 2.0 => true; "inside - at 0 left border")]
-    #[test_case(-1.0, -2.0, 0.0 => true; "inside - at 0 right border")]
-    #[test_case(6.28, 6.18, 0.1 => true; "inside - at PI looping")]
-    fn between(a: f64, left: f64, right: f64) -> bool {
-        is_angle_between(a, left, right)
-    }
-}
-
 fn main() {
     const WIDTH: usize = 128;
     const HEIGHT: usize = 64;
@@ -434,5 +414,25 @@ fn main() {
             },
             _ => (),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use test_case::test_case;
+
+    use crate::is_angle_between;
+
+    #[test_case(5.0, 4.0, 6.0 => true; "inside")]
+    #[test_case(5.0, 6.0, 7.0 => false; "outside - left")]
+    #[test_case(5.0, 3.0, 4.0 => false; "outside - right")]
+    #[test_case(0.0, 1.0, 2.0 => false; "outside - left - at 0")]
+    #[test_case(0.0, -2.0, -1.0 => false; "outside - right - at 0")]
+    #[test_case(0.0, -1.0, 1.0 => true; "inside - at 0")]
+    #[test_case(1.0, 0.0, 2.0 => true; "inside - at 0 left border")]
+    #[test_case(-1.0, -2.0, 0.0 => true; "inside - at 0 right border")]
+    #[test_case(6.28, 6.18, 0.1 => true; "inside - at PI looping")]
+    fn between(a: f64, left: f64, right: f64) -> bool {
+        is_angle_between(a, left, right)
     }
 }
