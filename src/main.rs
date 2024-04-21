@@ -175,7 +175,6 @@ impl Player {
     }
 }
 
-// TODO: Split into various checks. Execute from the cheapest to the most expensive.
 fn is_visible<A>(map: &Map, actor: &A, point: &Pos) -> bool
 where
     A: Actor,
@@ -187,17 +186,12 @@ where
     let Some(light) = actor.light() else {
         return false;
     };
+
     if distance(point, actor.pos()) > light.radius {
         return false;
     }
 
-    let dx = (actor.pos().x as i32 - point.x as i32) as f64;
-    let dy = (point.y as i32 - actor.pos().y as i32) as f64;
-    let atan = dy.atan2(dx) + consts::PI;
-    let left = reduce_angle(actor.angle(), light.width / 2.0);
-    let right = advance_angle(actor.angle(), light.width / 2.0);
-
-    if !is_angle_between(atan, left, right) {
+    if !is_within_fov(actor, point, light) {
         return false;
     }
 
@@ -250,6 +244,19 @@ where
             return true;
         }
     }
+}
+
+fn is_within_fov<A>(actor: &A, point: &Pos, light: &LightSpec) -> bool
+where
+    A: Actor,
+{
+    let dx = (actor.pos().x as i32 - point.x as i32) as f64;
+    let dy = (point.y as i32 - actor.pos().y as i32) as f64;
+    let atan = dy.atan2(dx) + consts::PI;
+    let left = reduce_angle(actor.angle(), light.width / 2.0);
+    let right = advance_angle(actor.angle(), light.width / 2.0);
+
+    is_angle_between(atan, left, right)
 }
 
 fn calculate_visibility<A>(map: &Map, actor: &A) -> Vec<bool>
