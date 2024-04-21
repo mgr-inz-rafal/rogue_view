@@ -259,7 +259,7 @@ where
     is_angle_between(atan, left, right)
 }
 
-fn calculate_visibility<A>(map: &Map, actor: &A) -> Vec<bool>
+fn calculate_visibility<A>(map: &Map, actor: &A, buffer: &mut Vec<bool>)
 where
     A: Actor + Sync,
 {
@@ -275,20 +275,20 @@ where
                 is_visible(map, actor, &Pos::new(x as u32, y as u32))
             }
         })
-        .collect()
+        .collect_into_vec(buffer)
 }
 
-fn print_map<A>(map: &Map, actor: &A)
+fn print_map<A>(map: &Map, actor: &A, buffer: &mut Vec<bool>)
 where
     A: Actor + Sync,
 {
     let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
 
-    let visibility_map = calculate_visibility(map, actor);
+    calculate_visibility(map, actor, buffer);
 
     map.tiles
         .iter()
-        .zip(visibility_map.iter())
+        .zip(buffer.iter())
         .enumerate()
         .map(|(index, (tile, visible))| {
             let y = index / map.width();
@@ -372,9 +372,11 @@ fn main() {
 
     let map = Map::from_file("maps/rust.txt");
 
+    let mut visibility_buffer = vec![false; WIDTH * HEIGHT];
+
     loop {
-        calculate_visibility(&map, &player);
-        print_map(&map, &player);
+        calculate_visibility(&map, &player, &mut visibility_buffer);
+        print_map(&map, &player, &mut visibility_buffer);
         let key = get_key();
         match key {
             KeyCode::Esc => break,
