@@ -57,13 +57,13 @@ impl Map {
         let width = first_line.len();
 
         let mut map = Self::new(width, lines.len());
-        for line in lines {
-            for c in line.chars() {
+        for (li, line) in lines.iter().enumerate() {
+            for (i, c) in line.chars().enumerate() {
                 let tile = match c {
-                    ' ' => Tile::Air,
+                    ' ' => continue,
                     c => Tile::Wall(c),
                 };
-                map.tiles.push(tile);
+                map.tiles[i + li * width] = tile;
             }
         }
         map
@@ -361,11 +361,10 @@ fn is_angle_between(a: f64, left: f64, right: f64) -> bool {
 }
 
 fn main() {
-    const WIDTH: usize = 128;
-    const HEIGHT: usize = 64;
+    let map = Map::from_file("maps/rust.txt");
 
     let mut player = Player::new_with_light(
-        Pos::new(WIDTH as u32 / 2, HEIGHT as u32 / 2),
+        Pos::new((map.width() / 2) as u32, (map.height() / 2) as u32),
         consts::PI,
         LightSpec::new(15.0, consts::PI / 4.0),
     );
