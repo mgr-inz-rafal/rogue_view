@@ -98,7 +98,7 @@ impl fmt::Display for Map {
     }
 }
 
-fn distance(a: &Pos, b: &Pos) -> f64 {
+fn distance(a: &Pos<u32>, b: &Pos<u32>) -> f64 {
     let dx = a.x as i32 - b.x as i32;
     let dy = a.y as i32 - b.y as i32;
 
@@ -109,13 +109,13 @@ fn distance(a: &Pos, b: &Pos) -> f64 {
 }
 
 #[derive(PartialEq)]
-struct Pos {
-    x: u32,
-    y: u32,
+struct Pos<T> {
+    x: T,
+    y: T,
 }
 
-impl Pos {
-    fn new(x: u32, y: u32) -> Self {
+impl<T> Pos<T> {
+    fn new(x: T, y: T) -> Self {
         Self { x, y }
     }
 }
@@ -132,19 +132,26 @@ impl LightSpec {
 }
 
 trait Actor {
-    fn pos(&self) -> &Pos;
+    fn tile_pos(&self) -> &Pos<u32>;
+    fn pos(&self) -> &Pos<f64>;
+    fn update_pos(&mut self, pos: Pos<f64>);
     fn angle(&self) -> f64;
     fn light(&self) -> Option<&LightSpec>;
 }
 
 struct Player {
-    pos: Pos,
+    tile_pos: Pos<u32>,
+    pos: Pos<f64>,
     angle: f64,
     light: Option<LightSpec>,
 }
 
 impl Actor for Player {
-    fn pos(&self) -> &Pos {
+    fn tile_pos(&self) -> &Pos<u32> {
+        &self.tile_pos
+    }
+
+    fn pos(&self) -> &Pos<f64> {
         &self.pos
     }
 
@@ -155,19 +162,21 @@ impl Actor for Player {
     fn light(&self) -> Option<&LightSpec> {
         self.light.as_ref()
     }
+
+    fn update_pos(&mut self, pos: Pos<f64>) {
+        self.tile_pos = to_tile_pos(&pos);
+        self.pos = pos;
+    }
+}
+
+fn to_tile_pos(pos: &Pos<f64>) -> Pos<u32> {
+    Pos::new(pos.x.round() as u32, pos.y.round() as u32)
 }
 
 impl Player {
-    fn _new(pos: Pos, angle: f64) -> Self {
+    fn new_with_light(pos: Pos<f64>, angle: f64, light: LightSpec) -> Self {
         Self {
-            pos,
-            angle,
-            light: None,
-        }
-    }
-
-    fn new_with_light(pos: Pos, angle: f64, light: LightSpec) -> Self {
-        Self {
+            tile_pos: to_tile_pos(&pos),
             pos,
             angle,
             light: Some(light),
@@ -175,11 +184,11 @@ impl Player {
     }
 }
 
-fn is_visible<A>(map: &Map, actor: &A, point: &Pos) -> bool
+fn is_visible<A>(map: &Map, actor: &A, point: &Pos<u32>) -> bool
 where
     A: Actor,
 {
-    if actor.pos() == point {
+    if actor.tile_pos() == point {
         return true;
     }
 
@@ -187,7 +196,7 @@ where
         return false;
     };
 
-    if distance(point, actor.pos()) > light.radius {
+    if distance(point, actor.tile_pos()) > light.radius {
         return false;
     }
 
@@ -195,14 +204,14 @@ where
         return false;
     }
 
-    if !cast_ray(actor.pos(), point, map) {
+    if !cast_ray(actor.tile_pos(), point, map) {
         return false;
     }
 
     true
 }
 
-fn cast_ray(a: &Pos, b: &Pos, map: &Map) -> bool {
+fn cast_ray(a: &Pos<u32>, b: &Pos<u32>, map: &Map) -> bool {
     let xdiff = a.x as i32 - b.x as i32;
     let xmul = match xdiff.cmp(&0) {
         Ordering::Less => 1.0,
@@ -247,12 +256,12 @@ fn cast_ray(a: &Pos, b: &Pos, map: &Map) -> bool {
     true
 }
 
-fn is_within_fov<A>(actor: &A, point: &Pos, light: &LightSpec) -> bool
+fn is_within_fov<A>(actor: &A, point: &Pos<u32>, light: &LightSpec) -> bool
 where
     A: Actor,
 {
-    let dx = (actor.pos().x as i32 - point.x as i32) as f64;
-    let dy = (point.y as i32 - actor.pos().y as i32) as f64;
+    let dx = (actor.tile_pos().x as i32 - point.x as i32) as f64;
+    let dy = (point.y as i32 - actor.tile_pos().y as i32) as f64;
     let atan = dy.atan2(dx) + consts::PI;
     let left = reduce_angle(actor.angle(), light.width / 2.0);
     let right = advance_angle(actor.angle(), light.width / 2.0);
@@ -277,7 +286,7 @@ where
         .map(|(index, _)| {
             let y = index / map.width();
             let x = index - y * map.width();
-            if actor.pos().x == x as u32 && actor.pos().y == y as u32 {
+            if actor.tile_pos().x == x as u32 && actor.tile_pos().y == y as u32 {
                 true
             } else {
                 is_visible(map, actor, &Pos::new(x as u32, y as u32))
@@ -303,7 +312,7 @@ where
             let x = index - y * map.width();
             (
                 index,
-                if actor.pos().x == x as u32 && actor.pos().y == y as u32 {
+                if actor.tile_pos().x == x as u32 && actor.tile_pos().y == y as u32 {
                     '@'.black().on_white()
                 } else if *visible {
                     match tile {
@@ -372,7 +381,7 @@ fn main() {
     let map = Map::from_file("maps/rust.txt");
 
     let mut player = Player::new_with_light(
-        Pos::new((map.width() / 2) as u32, (map.height() / 2) as u32),
+        Pos::new(map.width() as f64 / 2.0, map.height() as f64 / 2.0),
         consts::PI,
         LightSpec::new(15.0, consts::PI / 4.0),
     );
@@ -385,10 +394,10 @@ fn main() {
         let key = get_key();
         match key {
             KeyCode::Esc => break,
-            KeyCode::Left => player.pos.x -= 1,
-            KeyCode::Right => player.pos.x += 1,
-            KeyCode::Up => player.pos.y -= 1,
-            KeyCode::Down => player.pos.y += 1,
+            KeyCode::Left => player.tile_pos.x -= 1,
+            KeyCode::Right => player.tile_pos.x += 1,
+            KeyCode::Up => player.tile_pos.y -= 1,
+            KeyCode::Down => player.tile_pos.y += 1,
             KeyCode::PageUp => match player.light {
                 None => (),
                 Some(mut light) => {
@@ -419,6 +428,18 @@ fn main() {
                     player.light = Some(light)
                 }
             },
+            KeyCode::Char('w') | KeyCode::Char('W') => {
+                player.update_pos(Pos::new(
+                    player.pos.x + player.angle.cos(),
+                    player.pos.y - player.angle.sin(),
+                ));
+            }
+            KeyCode::Char('s') | KeyCode::Char('S') => {
+                player.update_pos(Pos::new(
+                    player.pos.x - player.angle.cos(),
+                    player.pos.y + player.angle.sin(),
+                ));
+            }
             _ => (),
         }
     }
