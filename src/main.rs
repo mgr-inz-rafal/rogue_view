@@ -77,7 +77,7 @@ impl Map {
         self.width
     }
 
-    fn _height(&self) -> usize {
+    fn height(&self) -> usize {
         self.tiles.len() / self.width
     }
 }
@@ -263,6 +263,13 @@ fn calculate_visibility<A>(map: &Map, actor: &A, buffer: &mut Vec<bool>)
 where
     A: Actor + Sync,
 {
+    debug_assert!(
+        buffer.len() >= map.height() * map.width(),
+        "visibility buffer to small, need {}, got {}",
+        map.height() * map.width(),
+        buffer.len()
+    );
+
     map.tiles
         .par_iter()
         .enumerate()
@@ -369,9 +376,7 @@ fn main() {
         LightSpec::new(15.0, consts::PI / 4.0),
     );
 
-    let map = Map::from_file("maps/rust.txt");
-
-    let mut visibility_buffer = vec![false; WIDTH * HEIGHT];
+    let mut visibility_buffer = vec![false; map.width() * map.height()];
 
     loop {
         calculate_visibility(&map, &player, &mut visibility_buffer);
